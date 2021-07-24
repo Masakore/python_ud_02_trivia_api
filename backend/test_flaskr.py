@@ -6,6 +6,9 @@ from flask_sqlalchemy import SQLAlchemy
 
 from flaskr import create_app
 from models import setup_db, Question, Category
+from dotenv import load_dotenv
+
+load_dotenv('flaskr/.test_env')
 
 
 class TriviaTestCase(unittest.TestCase):
@@ -13,11 +16,13 @@ class TriviaTestCase(unittest.TestCase):
 
     def setUp(self):
         """Define test variables and initialize app."""
-        self.app = create_app()
-        self.client = self.app.test_client
-        self.database_name = "trivia_test"
         self.database_path = "postgres://{}:{}@{}/{}".format(
-            'postgres', 'password', 'localhost:5432', self.database_name)
+            os.getenv('DB_ADMIN'), 
+            os.getenv('DB_PASSWORD'), 
+            os.getenv('DB_HOST'), 
+            os.getenv('DB_NAME'))
+        self.app = create_app(self.database_path)
+        self.client = self.app.test_client
         setup_db(self.app, self.database_path)
 
         # binds the app to the current context
@@ -45,6 +50,15 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(data['success'], True)
         self.assertTrue(len(data))
+
+    # @unittest.skip
+    def test_405_if_call_categories_using_non_get_method(self):
+        res = self.client().post('/categories')
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 405)
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['message'], 'method not allowed')
 
     # @unittest.skip
     def test_get_pagenated_questions(self):
@@ -99,8 +113,17 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(data['success'], True)
 
     # @unittest.skip
+    def test_422_if_any_question_param_is_missing(self):
+        res = self.client().post('/questions',
+                                 json={})
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(data['success'], False)
+
+    # @unittest.skip
     def test_search_questions(self):
-        res = self.client().post('/questions', json={'searchTerm': 'What'})
+        res = self.client().post('/questions/search', json={'searchTerm': 'What'})
         data = json.loads(res.data)
 
         self.assertEqual(res.status_code, 200)
@@ -108,6 +131,15 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(data['total_questions'], 7)
         self.assertTrue(data['questions'])
         self.assertTrue(data['current_category'])
+
+    # @unittest.skip
+    def test_422_if_search_term_is_not_sent(self):
+        res = self.client().post('/questions/search', json={})
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['message'], 'unprocessable')
 
     # @unittest.skip
     def test_get_questions_by_category(self):
@@ -119,6 +151,15 @@ class TriviaTestCase(unittest.TestCase):
         self.assertTrue(data['total_questions'])
         self.assertTrue(data['questions'])
         self.assertTrue(data['current_category'])
+
+    # @unittest.skip
+    def test_422_if_category_does_not_exist(self):
+        res = self.client().get('/categories/1000/questions')
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['message'], 'unprocessable')
 
     # @unittest.skip
     def test_get_quizzes(self):
